@@ -86,34 +86,41 @@
     </div>
 
     <!-- Section untuk menampilkan pesan -->
-    <div class="container pt-4 pb-5">
-      <h3 class="text-center mb-4">Pesan Anonim</h3>
+    <div class="row justify-content-center align-items-center">
+      <div class="col-md-8">
+        <div class="container pt-4 pb-5">
+          <h3 class="text-center mb-4">Pesan Anonim</h3>
 
-      <div class="row mb-2">
-        <div class="col-md-6">
-          <div id="info-count" class="small text-muted"></div>
-        </div>
-        <div class="col-md-6 text-end">
-          <label class="me-2 small">Pesan per halaman:</label>
-          <select
-            id="page-size-select"
-            class="form-select d-inline-block"
-            style="width: auto"
-          >
-            <option value="5" selected>5</option>
-            <option value="10">10</option>
-            <option value="20">20</option>
-          </select>
+          <div class="row mb-2">
+            <div class="col-md-6">
+              <div id="info-count" class="small text-muted"></div>
+            </div>
+            <div class="col-md-6 text-end">
+              <label class="me-2 small">Pesan per halaman:</label>
+              <select
+                id="page-size-select"
+                class="form-select d-inline-block"
+                style="width: auto"
+              >
+                <option value="5" selected>5</option>
+                <option value="10">10</option>
+                <option value="20">20</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="list-pesan">
+            <!-- Pesan dari Spreadsheet akan tampil di sini sebagai list vertikal -->
+          </div>
+
+          <nav aria-label="Pagination">
+            <ul
+              class="pagination justify-content-center mt-3"
+              id="pagination"
+            ></ul>
+          </nav>
         </div>
       </div>
-
-      <div id="list-pesan">
-        <!-- Pesan dari Spreadsheet akan tampil di sini sebagai list vertikal -->
-      </div>
-
-      <nav aria-label="Pagination">
-        <ul class="pagination justify-content-center mt-3" id="pagination"></ul>
-      </nav>
     </div>
 
     <div class="container pt-4 pb-3">
@@ -193,23 +200,19 @@
       // Render pagination dengan tombol Prev / Next + nomor halaman
       function renderPagination() {
         const totalPages = Math.max(1, Math.ceil(messages.length / pageSize));
-        // jika currentPage di luar range, adjust
         if (currentPage > totalPages) currentPage = totalPages;
         if (currentPage < 1) currentPage = 1;
 
         let html = "";
 
-        // Prev button
         html += `<li class="page-item ${currentPage === 1 ? "disabled" : ""}">
                   <a class="page-link" href="#" data-action="prev" aria-label="Previous">Previous</a>
                 </li>`;
 
-        // show up to +/-2 nomor di sekitar current
         const delta = 2;
         let start = Math.max(1, currentPage - delta);
         let end = Math.min(totalPages, currentPage + delta);
 
-        // jika di awal, perlu extend end; jika di akhir, extend start
         if (currentPage <= delta) {
           end = Math.min(totalPages, end + (delta - currentPage + 1));
         }
@@ -223,7 +226,6 @@
                   </li>`;
         }
 
-        // Next button
         html += `<li class="page-item ${
           currentPage === totalPages ? "disabled" : ""
         }">
@@ -232,7 +234,6 @@
 
         paginationEl.innerHTML = html;
 
-        // event delegation untuk pagination
         paginationEl.querySelectorAll("a").forEach((link) => {
           link.addEventListener("click", (ev) => {
             ev.preventDefault();
@@ -248,7 +249,6 @@
             }
             displayMessages();
             renderPagination();
-            // scroll ke atas daftar pesan untuk UX lebih baik
             listPesan.scrollIntoView({ behavior: "smooth" });
           });
         });
@@ -264,7 +264,6 @@
         const endIdx = Math.min(startIdx + pageSize, total);
         const pageMessages = messages.slice(startIdx, endIdx);
 
-        // info count & range
         if (total === 0) {
           infoCount.textContent = "Belum ada pesan.";
           listPesan.innerHTML =
@@ -277,32 +276,37 @@
           } - ${endIdx} dari ${total} pesan. Halaman ${currentPage} dari ${totalPages}.`;
         }
 
-        // kosongkan list
         listPesan.innerHTML = "";
 
-        // setiap pesan dibuat sebagai card (vertikal)
         pageMessages.forEach((item) => {
           const pesanRaw = item.pesan ? item.pesan : "(Pesan kosong)";
           const waktuRaw = item.timestamp ? new Date(item.timestamp) : null;
 
-          // card
           const card = document.createElement("div");
           card.className = "card shadow-sm mb-3";
 
           const cardBody = document.createElement("div");
-          cardBody.className = "card-body";
+          cardBody.className = "card-body d-flex align-items-start";
 
-          // pesan: gunakan innerHTML dengan string yang sudah di-escape + nl2br
+          // Icon user
+          const icon = document.createElement("i");
+          icon.className = "fa fa-user fa-2x text-secondary me-3 mt-1";
+
+          // pesan
           const p = document.createElement("p");
-          p.className = "card-text";
-          p.innerHTML = nl2brEscaped(pesanRaw); // aman karena di-escape dulu
+          p.className = "card-text mb-1";
+          p.innerHTML = nl2brEscaped(pesanRaw);
 
           const small = document.createElement("small");
           small.className = "text-muted";
           small.textContent = waktuRaw ? waktuRaw.toLocaleString() : "-";
 
-          cardBody.appendChild(p);
-          cardBody.appendChild(small);
+          const pesanWrapper = document.createElement("div");
+          pesanWrapper.appendChild(p);
+          pesanWrapper.appendChild(small);
+
+          cardBody.appendChild(icon);
+          cardBody.appendChild(pesanWrapper);
           card.appendChild(cardBody);
           listPesan.appendChild(card);
         });
@@ -312,22 +316,16 @@
       function loadPesan() {
         fetch(scriptURL)
           .then((res) => {
-            // Pastikan response json
             if (!res.ok) throw new Error("Network response was not ok");
             return res.json();
           })
           .then((json) => {
-            // FORMAT EXPECTED (example):
-            // { result: "success", data: [ { pesan: "text", timestamp: "2022-11-29T..." }, ... ] }
             if (json.result === "success" && Array.isArray(json.data)) {
-              // ambil data dan urutkan terbalik (terbaru di atas)
               messages = json.data.slice().reverse();
-              // reset current page jika perlu
               currentPage = 1;
               displayMessages();
               renderPagination();
             } else {
-              // fallback jika format beda
               console.warn(
                 "Response tidak sesuai format yang diharapkan:",
                 json
@@ -348,7 +346,6 @@
           });
       }
 
-      // ketika user ganti page size
       pageSizeSelect.addEventListener("change", () => {
         pageSize = parseInt(pageSizeSelect.value, 10) || 5;
         currentPage = 1;
@@ -356,7 +353,6 @@
         renderPagination();
       });
 
-      // panggil pertama kali
       loadPesan();
     </script>
 
